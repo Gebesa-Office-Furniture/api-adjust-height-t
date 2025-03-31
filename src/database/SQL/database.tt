@@ -1,0 +1,615 @@
+var filter_schema = ["temp", "utils", "dbo"];
+require('module-alias/register');
+
+if (filter_schema.length == 0) {
+  filter_schema = "";
+} else {
+  var filtering = "'" + filter_schema.join("','") + "'";
+  filter_schema = `where s.name not in (${filtering})`;
+}
+async function create() {
+  const fs = require("fs");
+
+  const code = `
+  const sql = require("mssql");
+  const dbConfig = require("@config/databaseConfig")
+  
+  class Database {
+    constructor() {
+      if (Database.instance) {
+        // Retorna la misma instancia si ya existe
+        return Database.instance;
+      }
+      const requiredEnvVars = [
+        'DB_USER',
+        'DB_PASSWORD',
+        'DB_SERVER',
+        'DB_DATABASE',
+        'DB_PORT'
+      ];
+    
+      requiredEnvVars.forEach((envVar) => {
+        if (!dbConfig[envVar]) {
+          throw new Error(\`Missing environment variable: \${envVar}\`);
+        }
+      });
+    
+      this.config = {
+          user: dbConfig.DB_USER,
+          password: dbConfig.DB_PASSWORD,
+          server: dbConfig.DB_SERVER,
+          database: dbConfig.DB_DATABASE,
+          port: parseInt(dbConfig.DB_PORT,10),
+          options: {
+            encrypt: true,
+            trustServerCertificate: true,
+          },
+          pool: {
+          min: 1,   // Número mínimo de conexiones en el pool
+          max: 20,  // Número máximo de conexiones en el pool
+          idleTimeoutMillis: 3000  // Tiempo en ms antes de cerrar una conexión inactiva
+        }
+      };
+      this.pool = null; // Variable para almacenar la conexión
+      Database.instance = this; // Guarda la instancia en el Singleton
+    }
+
+  /**
+   *@private 
+   */
+  async getPool() {
+    if (!this.pool) {
+      try {
+        this.pool = await sql.connect(this.config);
+      } catch (error) {
+        throw error;
+      }
+    }
+    return this.pool;
+  }
+    /**
+   * Executes the provided callback with a connection pool to the database.
+   * Ensures that the connection is closed after the operation, even if an error occurs.
+   * 
+   * @param {function(sql.ConnectionPool)} callback - The function to execute with the connection pool
+   * @returns {Promise<IResult<any>>} - The result of the callback function execution
+   */
+    async using(callback) {
+    const pool = await this.getPool();
+    try {
+        return await callback(pool);
+      } catch (error) {
+        throw error;
+      }
+        // finally{
+        //   await pool.close();
+        // }
+    }
+    async close() {
+     if (this.pool) {
+        await this.pool.close();
+      }
+    }
+  }
+  module.exports = new Database();
+`;
+
+  const path = require("path");
+  await fs.writeFileSync(path.join(__dirname, "database.js"), code, (err) => {
+    if (err) throw err;
+  });
+  const Database = require("./database");
+
+  var Directory = path.join(__dirname, "auto");
+  if (fs.existsSync(Directory))
+    fs.rmdirSync(Directory, {
+      recursive: true,
+      force: true,
+    });
+  fs.mkdirSync(Directory);
+  var SPs = []
+    var multimodel = await createModelsSP();
+  var modelsSP = multimodel.spmodels
+  var modelsTables = await createModels(); 
+  var models = [...modelsSP,...modelsTables];
+  await generateAutoModels(models)
+  await createSPExecs(); 
+
+  async function createSPExecs() {
+   
+    const query = `
+          SELECT
+              s.name AS SchemaName,
+                    p.name AS ProcedureName,
+                    pr.name AS ParameterName,
+                    jsType.name as DataTypeJS,
+                    sqlType.name as DataTypeSQL,
+                    pr.max_length AS MaxLength,
+                    pr.is_nullable AS IsNullable
+                FROM 
+                sys.procedures p
+                LEFT JOIN 
+                    sys.parameters pr ON p.object_id = pr.object_id
+                LEFT JOIN 
+                    sys.types t ON pr.user_type_id = t.user_type_id
+              JOIN
+            sys.schemas s ON p.schema_id = s.schema_id
+        OUTER APPLY(
+            SELECT
+                [name] = CASE
+                    WHEN t.name IN ('varchar', 'nvarchar', 'char', 'nchar', 'text') THEN 'string'
+                    WHEN t.name IN ('decimal', 'float', 'real','int') THEN 'number'
+                    WHEN t.name IN ('datetime', 'date') THEN 'Date'
+                    WHEN t.name = 'bit' THEN 'boolean'
+                    ELSE 'string'
+                END
+        ) AS jsType
+        OUTER APPLY(
+            SELECT
+                [name] = CASE
+                    WHEN t.name = 'int' THEN 'Int'
+                    WHEN t.name IN ('varchar', 'nvarchar', 'char', 'nchar', 'text') THEN 'NVarChar'
+                    WHEN t.name IN ('decimal', 'float', 'real') THEN 'Decimal(18,6)'
+                    WHEN t.name IN ('datetime', 'date') THEN 'DateTime'
+                    WHEN t.name = 'bit' THEN 'Boolean'
+                    ELSE 'string'
+                END
+        ) AS sqlType
+       ${filter_schema}
+        ORDER BY 
+            p.name, pr.parameter_id;
+    `;
+
+    var result = await Database.using(async function (pool) {
+      const result = await pool.request().query(query);
+
+      const procedures = {};
+
+      // Organiza los resultados en un objeto por nombre de procedimiento
+      if (result.recordset.length == 0) {
+        return "";
+      }
+
+      result.recordset.forEach((row) => {
+        var name = `${row.SchemaName}_${row.ProcedureName}`;
+        var spExec = `${row.SchemaName}.${row.ProcedureName}`;
+        if (!procedures[name]) {
+          procedures[name] = [];
+        }
+        SPs.push(spExec)
+        procedures[name].push({
+          name: row.ParameterName,
+          typeJS: row.DataTypeJS,
+          typeSQL: row.DataTypeSQL,
+          maxLength: row.MaxLength,
+          isNullable: row.IsNullable === 1,
+        });
+      });
+      // Genera las plantillas para cada procedimiento
+
+      var results = `const sql = require("mssql");
+const database = require("../database");
+const models = require("./databaseModels");
+
+class databaseStoreProcedures{`;
+
+      for (const procedureName in procedures) {
+        const params = procedures[procedureName];
+        let jsDocParams = "";
+        let inputs = "";
+        let data = "";
+        params.forEach((param) => {
+          if(param.name == null)
+          return;
+          var paramName = param.name.replace("@", "");
+          jsDocParams += `* @param {${param.typeJS}} parameters.${paramName} - ${
+            param.isNullable ? "Optional" : "Required"
+          }\n`;
+          inputs += `.input("${paramName}", sql.${param.typeSQL}, parameters.${paramName})\n`;
+          // data += `${paramName}, `;
+          
+        });
+        // data = data.substring(0, data.length - 2);
+        // Plantilla del SP en formato JavaScript
+const jsTemplate = `\n/**
+* @function ${procedureName}
+* @description Execute stored procedure ${procedureName}
+* @param {Object} parameters 
+${jsDocParams.split('\n').map(line => `${line}`).join('\n').trimEnd()} 
+* @returns {Promise<models.${procedureName}ReturnModel[]>} The result of the stored procedure
+*/
+async ${procedureName}(${inputs.length == 0 ? '' :'parameters = {}'}) {
+\treturn await database.using(async function(pool) {
+\t\tconst result = await pool
+\t\t\t.request()
+${inputs.split('\n').map(line => `\t\t\t${line}`).join('\n').trimEnd()}
+\t\t\t.execute("${procedureName.replace("_", ".")}");
+\t\treturn result.recordset;
+\t});
+}`;
+       
+        // Muestra la plantilla
+        results += jsTemplate + "\n\n";
+      }
+
+      return results + "\n}\nmodule.exports = new databaseStoreProcedures();";
+    });
+    if (result == "") {
+      return "";
+    }
+    await fs.writeFileSync(
+      path.join(Directory, "databaseStoreProcedures.js"),
+      result,
+      "utf8"
+    );
+  }
+  async function createModels() {
+    const query = `
+    select 
+      SchemaName,
+        TableName,
+        ColumnName,
+        jsType.name as DataTypeJS,
+        sqlType.name as DataTypeSQL,
+        MaxLength,
+        IsNullable,
+      column_id
+    from 
+    (SELECT
+        s.name AS SchemaName,
+        t.name AS TableName,
+        c.name AS ColumnName,
+        ty.name AS DataType,
+        c.max_length AS MaxLength,
+        c.is_nullable AS IsNullable,
+      c.column_id as column_id
+    FROM 
+        sys.tables t
+    INNER JOIN 
+        sys.columns c ON t.object_id = c.object_id
+    INNER JOIN 
+        sys.types ty ON c.user_type_id = ty.user_type_id
+    INNER JOIN
+        sys.schemas s ON t.schema_id = s.schema_id
+
+
+    UNION ALL
+
+    SELECT
+        s.name AS SchemaName,
+        v.name AS TableName,
+        c.name AS ColumnName,
+        ty.name AS DataType,
+        c.max_length AS MaxLength,
+        c.is_nullable AS IsNullable,
+      c.column_id as column_id
+    FROM 
+        sys.views v
+    INNER JOIN 
+        sys.columns c ON v.object_id = c.object_id
+    INNER JOIN 
+        sys.types ty ON c.user_type_id = ty.user_type_id
+    INNER JOIN
+        sys.schemas s ON v.schema_id = s.schema_id
+    ) as py
+    OUTER APPLY(
+        SELECT
+            [name] = CASE
+                WHEN DataType IN ('varchar', 'nvarchar', 'char', 'nchar', 'text') THEN 'string'
+                WHEN DataType IN ('decimal', 'float', 'real','int') THEN 'number'
+                WHEN DataType IN ('datetime', 'date') THEN 'Date'
+                WHEN DataType = 'bit' THEN 'boolean'
+                ELSE 'string'
+            END
+    ) AS jsType
+    OUTER APPLY(
+        SELECT
+            [name] = CASE
+                WHEN DataType = 'int' THEN 'Int'
+                WHEN DataType IN ('varchar', 'nvarchar', 'char', 'nchar', 'text') THEN 'NVarChar'
+                WHEN DataType IN ('decimal', 'float', 'real') THEN 'Double'
+                WHEN DataType IN ('datetime', 'date') THEN 'DateTime'
+                WHEN DataType = 'bit' THEN 'Boolean'
+                ELSE 'string'
+            END
+    ) AS sqlType
+    ORDER BY
+        TableName, column_id;
+      `;
+      const result = await Database.using(async (pool) => {
+        const result = await pool.request().query(query);
+          return result.recordsets[0];
+      });
+
+      return result;
+  }
+  async function createModelsSP() {
+    const query = `
+    DECLARE @table TABLE (
+    SchemaName varchar(200) NULL,
+    ProcedureName varchar(200) NULL,
+    is_hidden BIT,
+    column_ordinal INT,
+    name NVARCHAR(255),
+    is_nullable BIT,
+    system_type_id INT,
+    system_type_name NVARCHAR(255),
+    max_length INT,
+    precision INT,
+    scale INT,
+    collation_name NVARCHAR(255),
+    user_type_id INT,
+    user_type_database NVARCHAR(255),
+    user_type_schema NVARCHAR(255),
+    user_type_name NVARCHAR(255),
+    assembly_qualified_type_name NVARCHAR(255),
+    xml_collection_id INT,
+    xml_collection_database NVARCHAR(255),
+    xml_collection_schema NVARCHAR(255),
+    xml_collection_name NVARCHAR(255),
+    is_xml_document BIT,
+    is_case_sensitive BIT,
+    is_fixed_length_clr_type BIT,
+    source_server NVARCHAR(255),
+    source_database NVARCHAR(255),
+    source_schema NVARCHAR(255),
+    source_table NVARCHAR(255),
+    source_column NVARCHAR(255),
+    is_identity_column BIT,
+    is_part_of_unique_key BIT,
+    is_updateable BIT,
+    is_computed_column BIT,
+    is_sparse_column_set BIT,
+    ordinal_in_order_by_list INT,
+    order_by_is_descending BIT,
+    order_by_list_length INT,
+    tds_type_id INT,
+    tds_length INT,
+    tds_collation_id INT,
+    tds_collation_sort_id INT
+);
+
+DECLARE @SPModels TABLE (
+    id INT,
+    SchemaName varchar(200) NULL,
+    ProcedureName varchar(200) NULL,
+    name NVARCHAR(255),
+    system_type_id INT,
+    max_length INT,
+    is_nullable BIT,
+    column_ordinal INT
+);
+
+DECLARE @SchemaName NVARCHAR(128);
+DECLARE @ProcedureName NVARCHAR(128);
+DECLARE @sql NVARCHAR(128);
+DECLARE @Errores TABLE (
+    SchemaName NVARCHAR(128),
+    ProcedureName NVARCHAR(128),
+    ErrorMessage NVARCHAR(MAX)
+);
+
+-- Cursor para obtener los esquemas y nombres de los procedimientos almacenados
+DECLARE CursorSP CURSOR FOR
+SELECT 
+    SCHEMA_NAME(schema_id) AS SchemaName,
+    name AS ProcedureName
+FROM 
+    sys.objects
+WHERE 
+    type = 'P' AND SCHEMA_NAME(schema_id) NOT IN ('utils') -- Solo procedimientos almacenados
+ORDER BY 
+    SchemaName, ProcedureName;
+
+-- Abrir el cursor
+OPEN CursorSP;
+
+-- Leer el primer registro
+FETCH NEXT FROM CursorSP INTO @SchemaName, @ProcedureName;
+
+-- Recorrer todos los registros
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    BEGIN TRY
+        -- Generar el nombre del procedimiento completo
+        SET @sql = CONCAT(@SchemaName, '.', @ProcedureName);
+
+        -- Intentar ejecutar sp_describe_first_result_set
+        INSERT INTO @table (
+            is_hidden,
+            column_ordinal,
+            name,
+            is_nullable,
+            system_type_id,
+            system_type_name,
+            max_length,
+            precision,
+            scale,
+            collation_name,
+            user_type_id,
+            user_type_database,
+            user_type_schema,
+            user_type_name,
+            assembly_qualified_type_name,
+            xml_collection_id,
+            xml_collection_database,
+            xml_collection_schema,
+            xml_collection_name,
+            is_xml_document,
+            is_case_sensitive,
+            is_fixed_length_clr_type,
+            source_server,
+            source_database,
+            source_schema,
+            source_table,
+            source_column,
+            is_identity_column,
+            is_part_of_unique_key,
+            is_updateable,
+            is_computed_column,
+            is_sparse_column_set,
+            ordinal_in_order_by_list,
+            order_by_is_descending,
+            order_by_list_length,
+            tds_type_id,
+            tds_length,
+            tds_collation_id,
+            tds_collation_sort_id
+        )
+        EXEC sp_describe_first_result_set @sql;
+
+        -- Actualizar el nombre del esquema y procedimiento si la inserción fue exitosa
+        UPDATE @table
+        SET 
+            SchemaName = @SchemaName,
+            ProcedureName = @ProcedureName + 'ReturnModel'
+        WHERE 
+            SchemaName IS NULL;
+    END TRY
+    BEGIN CATCH
+        -- En caso de error, registrar el procedimiento y el mensaje de error
+        INSERT INTO @Errores (SchemaName, ProcedureName, ErrorMessage)
+        VALUES (@SchemaName, @ProcedureName, ERROR_MESSAGE());
+    END CATCH;
+
+    -- Leer el siguiente registro
+    FETCH NEXT FROM CursorSP INTO @SchemaName, @ProcedureName;
+END;
+
+-- Cerrar y liberar el cursor
+CLOSE CursorSP;
+DEALLOCATE CursorSP;
+
+-- Resultados finales
+SELECT
+    SchemaName,
+    ProcedureName AS TableName,
+    t.name AS ColumnName,
+    jsType.name AS DataTypeJS,  -- Mapeo para tipos de datos en JS
+    sqlType.name AS DataTypeSQL,  -- Mapeo para tipos de datos en SQL
+    t.max_length AS MaxLength,
+    t.is_nullable AS IsNullable
+FROM
+    @table t
+OUTER APPLY (
+    SELECT
+        [name] = CASE
+            WHEN t.system_type_id IN (167, 231, 175, 239, 35) THEN 'string'   -- varchar, nvarchar, char, nchar, text
+            WHEN t.system_type_id IN (106, 108, 109, 56) THEN 'number'        -- decimal, float, real, int
+            WHEN t.system_type_id IN (61, 40) THEN 'Date'                    -- datetime, date
+            WHEN t.system_type_id = 104 THEN 'boolean'                       -- bit
+            ELSE 'string'
+        END
+) AS jsType
+OUTER APPLY (
+    SELECT
+        [name] = CASE
+            WHEN t.system_type_id = 56 THEN 'Int'                            -- int
+            WHEN t.system_type_id IN (167, 231, 175, 239, 35) THEN 'NVarChar' -- varchar, nvarchar, char, nchar, text
+            WHEN t.system_type_id IN (106, 108, 109) THEN 'Decimal'           -- decimal, float, real
+            WHEN t.system_type_id IN (61, 40) THEN 'DateTime'                -- datetime, date
+            WHEN t.system_type_id = 104 THEN 'Boolean'                       -- bit
+            ELSE 'string'
+        END
+) AS sqlType
+ORDER BY
+    t.ProcedureName, t.column_ordinal;
+SELECT * FROM @Errores;
+    `;
+
+    const results = await Database.using(async (pool) => {
+       const result = await pool.request().query(query);
+       
+       return {
+        spmodels:result.recordsets[0],
+        spErrmodels:result.recordsets[1],
+       }
+    });
+
+    return results;
+  }
+  async function generateAutoModels(result) {
+    const tables = {};
+
+    if (result.length === 0) return "";
+
+    result.forEach((row) => {
+      const tableName = `${row.SchemaName}_${row.TableName}`;
+      if (!tables[tableName]) tables[tableName] = [];
+      
+      tables[tableName].push({
+        name: row.ColumnName,
+        typeJS: row.DataTypeJS,
+        typeSQL: row.DataTypeSQL,
+        maxLength: row.MaxLength,
+        isNullable: row.IsNullable === 1,
+      });
+
+    });
+
+    let results = ``;
+    // Recorre las tablas y genera las clases
+    var module_exports = "";
+    for (const tableName in tables) {
+      const columns = tables[tableName];
+      let jsDocParams = "";
+      let constructorParams = "";
+      let classFields = "";
+
+      columns.forEach((column) => {
+        const columnName = column.name;
+        jsDocParams += ` * @param {${
+          column.typeJS
+        }} conditions.${columnName} - ${
+          column.isNullable ? "Optional" : "Required"
+        }\n`;
+        constructorParams += `${columnName}, `;
+        classFields += `this.${columnName} = conditions.${columnName};\n`;
+      });
+      module_exports += `${tableName},`;
+      constructorParams = constructorParams.slice(0, -2); // Eliminar la última coma
+
+      const classTemplate = `/**
+* @class ${tableName}
+* @description Represents a table ${tableName} with its columns
+*/
+class ${tableName} {
+\t/**
+\t * Create an instance of the ${tableName} class.
+\t * @param {Object} conditions 
+${jsDocParams
+  .split("\n")
+  .map((line) => `\t${line}`)
+  .join("\n")}
+\t */
+\tconstructor(conditions = {}) {
+${classFields
+  .split("\n")
+  .map((line) => `\t\t${line}`)
+  .join("\n")}
+\t}
+}
+`;
+      results += classTemplate + `\n`;
+    }
+    module_exports = module_exports.slice(0, -1); // Eliminar la última coma
+   module_exports = module_exports.split(",").join(",\n");
+    results += `module.exports = {${module_exports} }`;
+
+    try {
+      await fs.promises.writeFile(
+        path.join(Directory, "databaseModels.js"),
+        results,
+        "utf8"
+      );
+      console.log("Archivo generado correctamente.");
+    } catch (error) {
+      console.error("Error en la generación de clases de tablas:", error);
+    }
+  }
+ await Database.close();
+ process.exit(0);
+}
+
+create();
+

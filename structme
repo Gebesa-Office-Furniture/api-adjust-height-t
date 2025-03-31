@@ -1,0 +1,21 @@
+#Arquitectura Modular de como esta preparado el proyecto
+src/
+  ├── config/ 
+  │   └── cryptConfig.js
+  │   └── databaseConfig.js
+  │   └── etc...
+  ├── controllers/ 
+  │   └── authController.js
+  ├── database/
+  │   └── SQL/
+  │     └── auto/
+  │         └── databaseModels.js
+  │         └── databaseStoreProcedures.js
+  │   └── database.js
+  ├── routes/ 
+  │   └── authRoutes.js
+  ├── services
+  │   └── authService.js
+  │   └── cryptService.js
+  │   └── jwtService.js
+  └── app.js --cerebro
