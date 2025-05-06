@@ -14,7 +14,7 @@ const PORT = 3000;
 //=====Routes=====
 const authRoutes = require("@routes/authRoutes");
 const sessionRoutes = require("@routes/sessionRoutes");
-//====================
+const statusRoutes = require("@routes/statusRoutes");
 //=====Middleware=====
 const errorHandler = require("@middlewares/errorHandlerMiddleware");
 const authMiddleware = require("@middlewares/authMiddleware");
@@ -35,6 +35,7 @@ try {
 
 //Routes
 app.use("/auth", authRoutes());
+app.use("/status", statusRoutes());
 // *****
 //Middleware active
 // *****
