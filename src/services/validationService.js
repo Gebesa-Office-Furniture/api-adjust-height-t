@@ -20,10 +20,18 @@ class ValidationService {
     return emailRegex.test(value);
   }
 
-  // Validate if the value is a valid phone number (optional: add a more specific regex)
+  // Validate if the value is a valid phone number
   static isValidPhoneNumber(value) {
+    if (this.isNullEmptyOrUndefined(value)) return false;
     const phoneRegex = /^\+?[1-9]\d{1,14}$/; // E.164 standard for phone numbers
     return phoneRegex.test(value);
+  }
+
+  // Validate if the value is a valid lada (country code)
+  static isValidLada(value) {
+    if (this.isNullEmptyOrUndefined(value)) return false;
+    const ladaRegex = /^\+[1-9]\d{0,3}$/; // Country codes typically start with + and have 1-4 digits
+    return ladaRegex.test(value);
   }
 
   // Validate if the length of a string is within a range

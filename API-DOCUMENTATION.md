@@ -77,8 +77,8 @@ Authorization: Bearer [token]
     "sPassword": "password123",
     "sName": "John Doe",
     "sProfilePicture": "",
-    "sPhoneNumber": "",
-    "sLada": "",
+    "sPhoneNumber": "1234567890",
+    "sLada": "+1",
     "sIdExternalProvider": "",
     "iIdRegistrationProvider": 1
   }
@@ -114,7 +114,7 @@ Authorization: Bearer [token]
   ```
 - **Status Codes**:
   - 200: Successful registration
-  - 400: Invalid registration data
+  - 400: Invalid registration data (e.g., invalid email, phone number format)
 
 #### Refresh Token
 - **URL**: `/auth/refreshToken`
@@ -575,6 +575,24 @@ Example error responses:
 ```json
 {
   "error": "Email cannot be empty"
+}
+```
+
+```json
+{
+  "error": "Invalid phone number format"
+}
+```
+
+```json
+{
+  "error": "Invalid country code format"
+}
+```
+
+```json
+{
+  "error": "Both phone number and country code must be provided"
 }
 ```
 
