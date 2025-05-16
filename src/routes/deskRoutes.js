@@ -5,6 +5,7 @@ module.exports = function AuthRoutes() {
   const router = express.Router();
   router.post("/movement", deskController.movement);
   router.post("/conexion", deskController.connection);
+  router.post("/adjust-height", deskController.adjustHeight);
 
   return router;
 };

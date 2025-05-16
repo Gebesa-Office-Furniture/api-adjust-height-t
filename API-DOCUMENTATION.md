@@ -395,6 +395,36 @@ Authorization: Bearer [token]
   - 200: Connection established successfully
   - 401: Failed to establish connection
 
+#### Adjust Desk Height
+- **URL**: `/session/desk/adjust-height`
+- **Method**: POST
+- **Requires Auth**: Yes
+- **Description**: Adjusts the connected desk to a specific height. The system will automatically move the desk up or down to reach the target height.
+- **Request Body**:
+  ```json
+  {
+    "sUUID": "device_uuid_string",
+    "dTargetHeight": 30.5,
+    "iMemoryPosition": 1
+  }
+  ```
+  Notes:
+  - `sUUID`: Unique identifier of the connected desk
+  - `dTargetHeight`: Target height in inches
+  - `iMemoryPosition`: Optional. If provided, will also save this height as a memory position (1-4)
+- **Response**:
+  ```json
+  {
+    "result": "Height adjustment initiated",
+    "targetHeight": 30.5,
+    "deskUUID": "device_uuid_string",
+    "memoryPosition": 1
+  }
+  ```
+- **Status Codes**:
+  - 200: Height adjustment initiated successfully
+  - 400: Failed to initiate height adjustment (invalid parameters or desk not found)
+
 ### Routine Management
 
 #### Create/Update Routine

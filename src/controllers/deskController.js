@@ -3,6 +3,7 @@ const deskService = require("@services/deskService");
 const ValidationService = require("@services/validationService");
 const DeskModel = require("@modelsExtras/DeskModel");
 const MovementHistory = require("@modelsExtras/MovementModel");
+const HeightAdjustmentModel = require("@modelsExtras/HeightAdjustmentModel");
 const UtilsService = require("@src/services/utilsService");
 
 class DeskController {
@@ -53,6 +54,58 @@ class DeskController {
         res.status(200).json({ result: filteredJSON });
       }
       else res.status(401).json({ result: "connection was not create" });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * Ajusta la altura del escritorio a un valor específico
+   * @type {MiddlewareFunction}
+   */
+  async adjustHeight(req, res, next) {
+    try {
+      // Get user ID from claims
+      const claims = new ClaimsService(req);
+      
+      // Create height adjustment object from request body
+      const heightAdjustment = new HeightAdjustmentModel(req.body);
+      heightAdjustment.iIdUser = claims.getID();
+      
+      // Validate input data
+      if (!ValidationService.isValidString(heightAdjustment.sUUID)) {
+        throw new TypeError("sUUID is not a string");
+      }
+      
+      if (!ValidationService.isValidNumber(heightAdjustment.dTargetHeight)) {
+        throw new TypeError("Target height is not a number");
+      }
+      
+      // Validate memory position if provided
+      if (heightAdjustment.iMemoryPosition !== undefined && 
+          (!ValidationService.isValidNumber(heightAdjustment.iMemoryPosition) || 
+           heightAdjustment.iMemoryPosition < 1 || 
+           heightAdjustment.iMemoryPosition > 4)) {
+        throw new TypeError("Memory position must be a number between 1 and 4");
+      }
+      
+      // Call service to adjust height
+      const result = await deskService.adjustHeight(heightAdjustment);
+      
+      // Return appropriate response
+      if (result.success) {
+        res.status(200).json({ 
+          result: "Height adjustment initiated",
+          targetHeight: heightAdjustment.dTargetHeight,
+          deskUUID: heightAdjustment.sUUID,
+          memoryPosition: heightAdjustment.iMemoryPosition
+        });
+      } else {
+        res.status(400).json({ 
+          result: "Height adjustment failed", 
+          message: result.message 
+        });
+      }
     } catch (error) {
       next(error);
     }
