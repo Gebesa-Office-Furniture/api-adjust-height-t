@@ -698,3 +698,77 @@ Common error codes:
   "iCaloriesToBurn": "Integer - Target calories to burn"
 }
 ```
+
+
+
+
+
+CAMBIOS BD:
+
+USE [devGebesaDesks]
+GO
+
+/****** Object:  View [usr].[vw_users]    Script Date: 5/14/2025 9:31:22 AM ******/
+SET ANSI_NULLS ON
+GO
+
+SET QUOTED_IDENTIFIER ON
+GO
+
+ALTER view [usr].[vw_users]
+AS
+SELECT 
+    u.iId,
+	u.sName,
+	u.sEmail,
+	u.sPhoneNumber,
+	u.sLada,
+	iViewMode = p3.iValue,
+	sViewMode = p3.sValue,
+	iIdLanguage = p.iValue,
+	sLanguage = p.sValue,
+	uai.dWeightKG,
+	uai.dHeightM,
+	iMeasureType = p2.iValue, 
+	sMeasureType = p2.sValue,
+	us.bSedentaryNotification,
+    objMemories=ISNULL(memories.memories,'[]'),
+	objRoutine = ISNULL(utils.firstData(rh.rh),'{}'),
+	lastRoutine = ISNULL(utils.firstData(routine.routine),'{}')
+FROM 
+    usr.users u
+LEFT JOIN config.userSettings us on us.iIdUser = u.iId
+left join usr.userAdditionalInfo uai on uai.iIdUser = u.iId
+left join config.parameters p on p.sKey = 'Language' and p.iValue = ISNULL(us.iIdLanguage,2)
+left join config.parameters p2 on p2.sKey = 'MeasureType' and p2.iValue = ISNULL(uai.iMeasureType,1)
+left join config.parameters p3 on p3.sKey = 'ViewMode' and p3.iValue = ISNULL(us.iViewMode,1)
+OUTER APPLY 
+    (SELECT iOrder,dHeightInch
+     FROM usr.userMemories um 
+     WHERE u.iId = um.iIdUser
+     FOR JSON PATH) AS memories(memories)
+OUTER APPLY (SELECT iId ,
+       iIdUser ,
+       iStatus ,
+       bCompleteRoutine ,
+       iDurationSecondsTarget ,
+       dtStartDate ,
+       dtEndDate ,
+       dtEndDate_Stop 
+     FROM  report.routineHistory rh 
+     WHERE u.iId = rh.iIdUser AND rh.iStatus = 1
+     FOR JSON PATH) AS rh(rh)
+OUTER APPLY 
+    (SELECT TOP 1 r.iId ,
+            r.sRoutineName ,
+            r.iDurationSeconds ,
+            r.dtRegistrationDate ,
+            r.iStatus
+     FROM usr.routine r
+     WHERE u.iId = r.iIdUser
+	 ORDER BY r.dtRegistrationDate DESC
+     FOR JSON PATH) AS routine(routine)
+
+
+
+GO

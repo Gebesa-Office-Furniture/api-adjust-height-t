@@ -42,6 +42,7 @@ class UserController {
       if (success) res.status(200).json({ result: "Info was updated" });
       else res.status(401).json({ result: "Info was not updated" });
     } catch (error) {
+      console.log(error);
       next(error);
     }
   }
