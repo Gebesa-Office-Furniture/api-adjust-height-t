@@ -57,7 +57,6 @@ class DeskController {
       next(error);
     }
   }
-
 }
 
 module.exports = new DeskController();

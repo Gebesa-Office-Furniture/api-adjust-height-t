@@ -11,10 +11,12 @@ const cron = require("node-cron");
 
 const app = express();
 const PORT = 3000;
+const { initSocket } = require("@src/socketio/socket.js"); 
 //=====Routes=====
 const authRoutes = require("@routes/authRoutes");
 const sessionRoutes = require("@routes/sessionRoutes");
 const statusRoutes = require("@routes/statusRoutes");
+const deskRoutes = require("@routes/deskRoutes");
 //=====Middleware=====
 const errorHandler = require("@middlewares/errorHandlerMiddleware");
 const authMiddleware = require("@middlewares/authMiddleware");
@@ -35,6 +37,7 @@ try {
 
 //Routes
 app.use("/auth", authRoutes());
+app.use("/desk", deskRoutes());
 app.use("/status", statusRoutes());
 // *****
 //Middleware active
@@ -51,20 +54,21 @@ app.get("/", (req, res) => {
 //Middlewares
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+const server = initSocket(app);          // envuelve Express
+server.listen(PORT, () => {
+  console.log(`Server + WS running on port ${PORT}`);
 });
 
 process.on("SIGINT", () => {
   console.log("Server manually stopped.");
   tokenService.closeConnection();
-  process.exit(0);
+  server.close(() => process.exit(0));
 });
 
 process.on("SIGTERM", () => {
   console.log("Server stopped by system.");
   tokenService.closeConnection();
-  process.exit(0);
+  server.close(() => process.exit(0));
 });
 
 
