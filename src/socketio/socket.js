@@ -20,7 +20,10 @@ function initSocket(app) {
   io.on('connection', (socket) => {
 
     // La app Flutter envía el deskId para unirse a la “sala”
-    socket.on('joinDesk', (deskId) => socket.join(String(deskId), () => console.log(`User ${socket.id} joined desk ${deskId}`)));
+    socket.on('joinDesk', (sUUID) => {
+      console.log(`joinDesk sUUID recibido: ${sUUID}`);
+      socket.join(sUUID);
+    });
 
     // ACK: la app confirma que terminó el movimiento
     socket.on('desk:ack', async ({ cmdId }) => {

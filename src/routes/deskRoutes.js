@@ -13,35 +13,28 @@ module.exports = function AuthRoutes() {
   
   /*Perdonenme por esta atrocidad*/
   router.post(
-    '/:deskId/height',
+    '/:sUUID/height',                       // ← en la ruta
     [
-      param('deskId').isInt().toInt(),
-      body('targetMm').isInt({ min: 650, max: 1300 }).toInt()
+      param('sUUID').isUUID('all'),
+      body('targetMm').isInt({ min: 300 }).toInt()   // rango lo valida el SP
     ],
     async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(422).json({ errors: errors.array() });
-      }
-  
-      const { deskId }   = req.params;
+      const { sUUID }   = req.params;       // ← aquí lo obtienes
       const { targetMm } = req.body;
-  
+
       try {
-        // Garantiza un pool conectado y reutilizable
         const result = await database.using(async (pool) => {
           return await pool.request()
-            .input('iIdDesk',  sql.Int, deskId)
-            .input('targetMm', sql.Int, targetMm)
+            .input('sUUID',    sql.Char(36), sUUID)   // ①  → ahora sí lo envías
+            .input('targetMm', sql.Int,      targetMm)
             .execute('desk.SP_AddHeightCommand');
         });
-  
+
         const cmdId = result.recordset[0].cmdId;
-  
-        // Emitir evento a la app
-        getIO().to(String(deskId))
-               .emit('desk:height', { cmdId, targetMm });
-  
+
+        getIO().to(sUUID)                   // la “room” también es el UUID
+              .emit('desk:height', { cmdId, targetMm });
+
         return res.status(201).json({ cmdId, targetMm });
       } catch (err) {
         console.error('DB error:', err);
@@ -49,6 +42,7 @@ module.exports = function AuthRoutes() {
       }
     }
   );
+
 
   return router;
 };
