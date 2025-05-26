@@ -61,6 +61,8 @@ async desk_SP_Conexion(parameters = {}) {
 			.input("sDeskName", sql.NVarChar, parameters.sDeskName)
 			.input("sUUID", sql.NVarChar, parameters.sUUID)
 			.input("iStatus", sql.Int, parameters.iStatus)
+			.input("MinHeightMm", sql.Decimal, parameters.MinHeightMm)
+			.input("MaxHeightMm", sql.Decimal, parameters.MaxHeightMm)
 			.execute("desk.SP_Conexion");
 		return result.recordset;
 	});

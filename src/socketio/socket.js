@@ -3,6 +3,8 @@ const http        = require('http');
 const { Server }  = require('socket.io');
 const database    = require('../database/SQL/database');   // tu singleton
 const sql         = require('mssql');
+const jwtService  = require('../services/jwtService');
+const validationService = require('../services/validationService');
 
 let io;                                          // referencia global
 

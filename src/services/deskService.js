@@ -19,7 +19,14 @@ class DeskService {
    * @returns {desk_desks}
    */
   async connection(desk) {
-    const desk_data = await desk_SP_Conexion({iIdUser:desk.iIdUser,sUUID:desk.sUUID,iStatus:desk.iStatus,sDeskName:desk.sDeskName}).firstOrDefault()
+    const desk_data = await desk_SP_Conexion({
+      iIdUser: desk.iIdUser,
+      sDeskName: desk.sDeskName,
+      sUUID: desk.sUUID,
+      iStatus: desk.iStatus,
+      MinHeightMm: desk.dMinHeightMm,
+      MaxHeightMm: desk.dMaxHeightMm
+    }).firstOrDefault()
     return desk_data;
   }
 
