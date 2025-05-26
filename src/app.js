@@ -17,6 +17,7 @@ const authRoutes = require("@routes/authRoutes");
 const sessionRoutes = require("@routes/sessionRoutes");
 const statusRoutes = require("@routes/statusRoutes");
 const deskRoutes = require("@routes/deskRoutes");
+const reportRoutes = require("@routes/reportRoutes");
 //=====Middleware=====
 const errorHandler = require("@middlewares/errorHandlerMiddleware");
 const authMiddleware = require("@middlewares/authMiddleware");
@@ -39,6 +40,7 @@ try {
 app.use("/auth", authRoutes());
 app.use("/desk", deskRoutes());
 app.use("/status", statusRoutes());
+app.use("/report", reportRoutes());
 // *****
 //Middleware active
 // *****

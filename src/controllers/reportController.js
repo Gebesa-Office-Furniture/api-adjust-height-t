@@ -25,6 +25,24 @@ class ReportController {
       next(error);
     }
   }
+
+  /**
+   * Get latest movement history by user ID
+   * @type {MiddlewareFunction}
+   */
+  async get_latest_movement(req, res, next) {
+    try {
+      var claims = new ClaimsService(req);
+      var iIdUser = claims.getID();
+
+      var success = await reportService.get_latest_movement_by_user(iIdUser);
+
+      if (success) res.status(200).json({ result: success });
+      else res.status(404).json({ result: "No movement history found" });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new ReportController();
