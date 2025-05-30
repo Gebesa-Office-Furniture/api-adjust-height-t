@@ -4,6 +4,7 @@ const ValidationService = require("@services/validationService");
 const DeskModel = require("@modelsExtras/DeskModel");
 const MovementHistory = require("@modelsExtras/MovementModel");
 const UtilsService = require("@src/services/utilsService");
+const { getIO }      = require('../socketio/socket.js');
 
 class DeskController {
   /**
@@ -87,6 +88,49 @@ class DeskController {
       }
     } catch (error) {
       next(error);
+    }
+  }
+  
+   /**
+   * Envía un comando de altura a la mesa (:sUUID/height)
+   * @type {MiddlewareFunction}
+   */
+   async moveToHeight(req, res) {
+    try {
+      /* ───── Autenticación ───── */
+      const claims = new ClaimsService(req);
+      const userId = claims.getID();
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+
+      /* ───── Parámetros ───── */
+      const { sUUID }   = req.params;          // UUID de la mesa
+      const { targetMm } = req.body;           // Altura objetivo
+      if (!ValidationService.isValidString(sUUID))
+        throw new TypeError("sUUID is not a string/uuid");
+
+      /* ───── Servicio ───── */
+      const result = await database.using(async (pool) => {
+        return await pool.request()
+          .input('sUUID',    sql.Char(36), sUUID)   // ①  → ahora sí lo envías
+          .input('targetMm', sql.Int,      targetMm)
+          .execute('desk.SP_AddHeightCommand');
+      });
+
+      /* ───── Respuesta ───── */
+      if (result) {
+        const cmdId = result.recordset[0].cmdId;
+        getIO().to(sUUID)                   // la “room” también es el UUID
+              .emit('desk:height', { cmdId, targetMm });
+
+        return res.status(201).json({ cmdId, targetMm });
+      }else {
+        return res.status(401).json({ result: "height command was not created" });
+      }
+    } catch (error) {
+      console.error('DB error:', error);
+      return res.status(500).json({ error: 'Database error' });
     }
   }
 }
