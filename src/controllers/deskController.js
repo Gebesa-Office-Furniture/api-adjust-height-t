@@ -5,6 +5,8 @@ const DeskModel = require("@modelsExtras/DeskModel");
 const MovementHistory = require("@modelsExtras/MovementModel");
 const UtilsService = require("@src/services/utilsService");
 const { getIO }      = require('../socketio/socket.js');
+const database       = require('../database/SQL/database.js');   // singleton
+const sql            = require('mssql');     
 
 class DeskController {
   /**
@@ -97,13 +99,6 @@ class DeskController {
    */
    async moveToHeight(req, res) {
     try {
-      /* ───── Autenticación ───── */
-      const claims = new ClaimsService(req);
-      const userId = claims.getID();
-      if (!userId) {
-        return res.status(401).json({ error: "Unauthorized" });
-      }
-
       /* ───── Parámetros ───── */
       const { sUUID }   = req.params;          // UUID de la mesa
       const { targetMm } = req.body;           // Altura objetivo
