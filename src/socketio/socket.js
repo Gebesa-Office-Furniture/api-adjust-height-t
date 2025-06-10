@@ -21,11 +21,37 @@ function initSocket(app) {
 
   io.on('connection', (socket) => {
 
-    // La app Flutter envía el deskId para unirse a la “sala”
-    socket.on('joinDesk', (sUUID) => {
-      console.log(`joinDesk sUUID recibido: ${sUUID}`);
-      socket.join(sUUID);
+  // La app Flutter envía el deskId para unirse a la “sala”
+  socket.on('joinDesk', async ({ sUUID, sName }) => {
+
+    console.log(`Socket ${socket.id} se unió a la sala: ${sName} con UUID: ${sUUID}`);
+
+  // Sanea y valida UUID
+  if (!validationService.isValidUuid(sUUID)) {
+    return socket.emit('error', 'invalid-uuid');
+  }
+
+  socket.join(deskName);
+
+  //UPSERT seguro
+  try {
+    await database.using(async (pool) => {
+      await pool.request()
+        .input('name', sql.VarChar, sName)
+        .input('uuid', sql.VarChar, sUUID)
+        .query(`
+          MERGE desk.desks AS t
+          USING (SELECT @deskName AS sDeskName, @uuid AS sUUID) AS src
+          ON (t.sDeskName = src.sDeskName)
+          WHEN MATCHED THEN
+          UPDATE SET t.sUUID = src.sUUID, t.dtLastConnection = SYSUTCDATETIME()
+        `);
     });
+  } catch (err) {
+    console.error('Upsert error:', err);
+  }
+  console.log("No hay fallo en la conexión de socket");
+});
 
     // ACK: la app confirma que terminó el movimiento
     socket.on('desk:ack', async ({ cmdId }) => {

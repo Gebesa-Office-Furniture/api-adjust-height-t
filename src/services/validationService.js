@@ -49,6 +49,12 @@ class ValidationService {
   static isValidBoolean(value) {
     return typeof value === "boolean";
   }
+  
+  // Regular expression to validate UUID format
+  static isValidUuid(value) {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(value);
+  }
 
   // Validate that the value is a non-empty array
   static isValidArray(value) {
