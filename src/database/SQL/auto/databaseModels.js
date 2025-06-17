@@ -170,6 +170,8 @@ class usr_SP_getUsersReturnModel {
 	 * @param {string} conditions.objMemories - Required
 	 * @param {string} conditions.objRoutine - Required
 	 * @param {string} conditions.lastRoutine - Required
+	 * @param {string} conditions.sPhoneNumber - Phone number of the user
+	 * @param {string} conditions.sLada - Country code for the phone number
 	
 	 */
 	constructor(conditions = {}) {
@@ -187,6 +189,8 @@ class usr_SP_getUsersReturnModel {
 		this.objMemories = conditions.objMemories;
 		this.objRoutine = conditions.objRoutine;
 		this.lastRoutine = conditions.lastRoutine;
+		this.sPhoneNumber = conditions.sPhoneNumber;
+		this.sLada = conditions.sLada;
 		
 	}
 }

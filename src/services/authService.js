@@ -16,10 +16,19 @@ class AuthService {
   
   async register(user) {
     user.iId=-1;
-    var userBD = await usr_SP_user_merge(user).firstOrDefault();
-    userBD.objMemories = JSON.parse(userBD.objMemories); 
-    userBD.objRoutine = JSON.parse(userBD.objRoutine); 
-    userBD.lastRoutine = JSON.parse(userBD.lastRoutine); 
+    console.log('Calling usr_SP_user_merge with:', user);
+    var result = await usr_SP_user_merge(user);
+    console.log('SP result:', result);
+    var userBD = result.firstOrDefault();
+    console.log('userBD after firstOrDefault:', userBD);
+    
+    if (!userBD) {
+      throw new Error('Failed to create user - stored procedure returned no records');
+    }
+    
+    userBD.objMemories = JSON.parse(userBD.objMemories || '[]'); 
+    userBD.objRoutine = JSON.parse(userBD.objRoutine || '{}'); 
+    userBD.lastRoutine = JSON.parse(userBD.lastRoutine || '{}'); 
  
     return userBD;
   }

@@ -61,6 +61,8 @@ async desk_SP_Conexion(parameters = {}) {
 			.input("sDeskName", sql.NVarChar, parameters.sDeskName)
 			.input("sUUID", sql.NVarChar, parameters.sUUID)
 			.input("iStatus", sql.Int, parameters.iStatus)
+			.input("MinHeightMm", sql.Decimal, parameters.MinHeightMm)
+			.input("MaxHeightMm", sql.Decimal, parameters.MaxHeightMm)
 			.execute("desk.SP_Conexion");
 		return result.recordset;
 	});
@@ -399,17 +401,22 @@ async usr_SP_user_login(parameters = {}) {
 * @returns {Promise<models.usr_SP_user_mergeReturnModel[]>} The result of the stored procedure
 */
 async usr_SP_user_merge(parameters = {}) {
-	return await database.using(async function(pool) {
-		const result = await pool
-			.request()
-			.input("iId", sql.Int, parameters.iId)
-			.input("sName", sql.NVarChar, parameters.sName)
-			.input("sEmail", sql.NVarChar, parameters.sEmail)
-			.input("sPassword", sql.NVarChar, parameters.sPassword)
-			.input("sProfilePicture", sql.NVarChar, parameters.sProfilePicture)
-			.execute("usr.SP_user_merge");
-		return result.recordset;
-	});
+  return await database.using(async function (pool) {
+    const result = await pool
+      .request()
+      .input("iId",            sql.Int,       parameters.iId)
+      .input("sName",          sql.NVarChar,  parameters.sName)
+      .input("sEmail",         sql.NVarChar,  parameters.sEmail)
+      .input("sPassword",      sql.NVarChar,  parameters.sPassword)
+      .input("sProfilePicture",sql.NVarChar,  parameters.sProfilePicture)
+
+      // ► NUEVO
+      .input("sLada",          sql.NVarChar,  parameters.sLada)
+      .input("sPhoneNumber",   sql.NVarChar,  parameters.sPhoneNumber)
+
+      .execute("usr.SP_user_merge");
+    return result.recordset;
+  });
 }
 
 
