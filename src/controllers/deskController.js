@@ -128,6 +128,47 @@ class DeskController {
       return res.status(500).json({ error: 'Database error' });
     }
   }
+
+  async changeDeskUUID(req, res, next) {
+    try {
+      const { sName, sNewUUID, dMinHeightMm, dMaxHeightMm } = req.body;
+
+      // Validaciones básicas
+      if (!ValidationService.isValidString(sName) || 
+          !ValidationService.isValidString(sNewUUID) || 
+          !ValidationService.isValidNumber(dMinHeightMm) ||
+          !ValidationService.isValidNumber(dMaxHeightMm)){
+        return res.status(400).json({ error: 'Invalid data' });
+      }
+      const minIntHeight = Math.round(dMinHeightMm);
+      const maxIntHeight = Math.round(dMaxHeightMm);
+
+      // 1) devolvemos el resultado del query
+      const result = await database.using(async (pool) => {
+        return pool.request()                     // <─ return aquí
+          .input('sName',   sql.NVarChar(100), sName)
+          .input('newUUID', sql.Char(36), sNewUUID)
+          .input('dMinHeightMm', sql.Int, minIntHeight)
+          .input('dMaxHeightMm', sql.Int, maxIntHeight)
+          .query(`
+            UPDATE desk.desks
+            SET sUUID = @newUUID,
+            minHeightMm = @dMinHeightMm,
+            maxHeightMm = @dMaxHeightMm
+            WHERE sDeskName = @sName
+          `);
+      });
+
+      // 2) ahora result está definido
+      if (result.rowsAffected[0] === 0) {
+        return res.status(404).json({ error: 'Desk not found' });
+      }
+
+      return res.status(200).json({ success: true, message: 'Desk UUID changed successfully' });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new DeskController();

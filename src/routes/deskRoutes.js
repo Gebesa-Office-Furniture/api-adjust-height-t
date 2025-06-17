@@ -6,6 +6,8 @@ module.exports = function AuthRoutes() {
   router.post("/movement", deskController.movement);
   router.post("/conexion", deskController.connection);
   router.post('/:sUUID/height', deskController.moveToHeight);
+  router.get("/:sName", deskController.changeDeskUUID);
+  router.post("/changeUUID", deskController.changeDeskUUID);
 
   return router;
 };

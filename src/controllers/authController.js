@@ -90,6 +90,8 @@ class AuthController {
 
       console.log(user);
 
+      /* Aun no se lanza a produccion, por lo que no se valida el telefono y lada
+      
       // Validate phone number if provided
       if (user.sPhoneNumber && !ValidationService.isValidPhoneNumber(user.sPhoneNumber)) {
         throw new TypeError("Invalid phone number format");
@@ -104,7 +106,7 @@ class AuthController {
       if ((user.sPhoneNumber && !user.sLada) || (!user.sPhoneNumber && user.sLada)) {
         throw new TypeError("Both phone number and country code must be provided");
       }
-
+      */
       var sPasswordHashed = await cryptService.hashPassword(user.sPassword);
       //change the password for sPasswordHashed
       user.sPassword = sPasswordHashed;
