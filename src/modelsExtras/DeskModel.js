@@ -12,6 +12,8 @@ class DeskModel{
        this.sUUID = desk.sUUID;
        this.iStatus = desk.iStatus;
        this.sDeskName = desk.sDeskName;
+       this.dMinHeight = desk.dMinHeightMm;
+       this.dMaxHeight = desk.dMaxHeightMm;
 
    }
 }

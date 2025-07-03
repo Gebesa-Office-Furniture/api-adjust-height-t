@@ -24,8 +24,8 @@ class DeskService {
       sDeskName: desk.sDeskName,
       sUUID: desk.sUUID,
       iStatus: desk.iStatus,
-      MinHeightMm: desk.dMinHeightMm,
-      MaxHeightMm: desk.dMaxHeightMm
+      iMinHeightMm: desk.dMinHeightMm,
+      iMaxHeightMm: desk.dMaxHeightMm
     }).firstOrDefault()
     return desk_data;
   }
