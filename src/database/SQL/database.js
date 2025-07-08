@@ -31,6 +31,8 @@
           options: {
             encrypt: true,
             trustServerCertificate: true,
+            // Habilitar Always Encrypted
+            columnEncryptionSetting: true 
           },
           pool: {
           min: 1,   // Número mínimo de conexiones en el pool

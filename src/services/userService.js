@@ -51,8 +51,20 @@ class UserService {
    return goal
   }
   async delete(iId){
-    var success = await usr_SP_user_delete({iId}).firstOrDefault();
-    return success.bActive;
+    // Generar datos anonimizados para Always Encrypted
+    // IMPORTANTE: Estos valores deben ser únicos para evitar conflictos con otros usuarios
+    const timestamp = Date.now();
+    const anonymizedName = `DELETED_USER_${timestamp}`;
+    const anonymizedEmail = `deleted_${timestamp}@anonymous.com`;
+    
+    // Llamar al SP con los parámetros requeridos para Always Encrypted
+    var result = await usr_SP_user_delete({
+      iId: iId,
+      anonymizedName: anonymizedName,
+      anonymizedEmail: anonymizedEmail
+    }).firstOrDefault();
+    
+    return result.Success;
   }
 }
 

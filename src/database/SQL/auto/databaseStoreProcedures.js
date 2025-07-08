@@ -357,7 +357,9 @@ async report_SP_stop_routineUser(parameters = {}) {
 * @function usr_SP_User_delete
 * @description Execute stored procedure usr_SP_User_delete
 * @param {Object} parameters 
-* @param {number} parameters.iId - Required 
+* @param {number} parameters.iId - Required
+* @param {string} parameters.anonymizedName - Required (debe coincidir con tipo NVARCHAR(100))
+* @param {string} parameters.anonymizedEmail - Required (debe coincidir con tipo NVARCHAR(100) encriptado)
 * @returns {Promise<models.usr_SP_User_deleteReturnModel[]>} The result of the stored procedure
 */
 async usr_SP_User_delete(parameters = {}) {
@@ -365,6 +367,8 @@ async usr_SP_User_delete(parameters = {}) {
 		const result = await pool
 			.request()
 			.input("iId", sql.Int, parameters.iId)
+			.input("anonymizedName", sql.NVarChar(100), parameters.anonymizedName)
+			.input("anonymizedEmail", sql.NVarChar(200), parameters.anonymizedEmail)
 			.execute("usr.SP_User_delete");
 		return result.recordset;
 	});
@@ -382,7 +386,7 @@ async usr_SP_user_login(parameters = {}) {
 	return await database.using(async function(pool) {
 		const result = await pool
 			.request()
-			.input("sEmail", sql.NVarChar, parameters.sEmail)
+			.input("sEmail", sql.NVarChar(200), parameters.sEmail) // Tipo exacto para Always Encrypted
 			.execute("usr.SP_user_login");
 		return result.recordset;
 	});
@@ -404,15 +408,15 @@ async usr_SP_user_merge(parameters = {}) {
   return await database.using(async function (pool) {
     const result = await pool
       .request()
-      .input("iId",            sql.Int,       parameters.iId)
-      .input("sName",          sql.NVarChar,  parameters.sName)
-      .input("sEmail",         sql.NVarChar,  parameters.sEmail)
-      .input("sPassword",      sql.NVarChar,  parameters.sPassword)
-      .input("sProfilePicture",sql.NVarChar,  parameters.sProfilePicture)
+      .input("iId",            sql.Int,            parameters.iId)
+      .input("sName",          sql.NVarChar(100),  parameters.sName)         // Tipo exacto
+      .input("sEmail",         sql.NVarChar(100),  parameters.sEmail)        // Tipo exacto para Always Encrypted
+      .input("sPassword",      sql.NVarChar(100),  parameters.sPassword)     // Tipo exacto
+      .input("sProfilePicture",sql.NVarChar(255),  parameters.sProfilePicture) // Tipo exacto
 
-      // ► NUEVO
-      .input("sLada",          sql.NVarChar,  parameters.sLada)
-      .input("sPhoneNumber",   sql.NVarChar,  parameters.sPhoneNumber)
+      // Columnas encriptadas con Always Encrypted
+      .input("sLada",          sql.NVarChar(10),   parameters.sLada || null)       // Tipo exacto
+      .input("sPhoneNumber",   sql.NVarChar(20),   parameters.sPhoneNumber || null) // Tipo exacto
 
       .execute("usr.SP_user_merge");
     return result.recordset;
