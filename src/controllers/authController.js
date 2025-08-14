@@ -107,21 +107,40 @@ class AuthController {
         throw new TypeError("Both phone number and country code must be provided");
       }
       */
+      
       var sPasswordHashed = await cryptService.hashPassword(user.sPassword);
-      //change the password for sPasswordHashed
       user.sPassword = sPasswordHashed;
-      //verifica la session y regresa el token de acceso del usuario
+      
+      // Set default package information if not provided
+      if (!user.iPackageId) user.iPackageId = 0;
+      if (!user.sPackageName) user.sPackageName = "trial";
+      if (!user.sPackageInterval) user.sPackageInterval = "month";
+      if (!user.sPackageStatus) user.sPackageStatus = "Active";
+      
+      // Set default credits and tokens if not provided
+      if (!user.iCredits) user.iCredits = 10000;
+      if (!user.iCreditsUsed) user.iCreditsUsed = 0;
+      if (!user.iMultiplier) user.iMultiplier = 10000;
+      if (!user.iTokens) user.iTokens = 10000000;
+      if (!user.iTokensUsed) user.iTokensUsed = 0;
+      
+      // Set default preferences as empty string if not provided
+      if (!user.objPreferences) {
+        user.objPreferences = '';
+      }
+
       const privateUser = await AuthService.register(user);
       const { token, tokenExpiresIn } = jwtService.generateToken(privateUser);
       const { refreshToken, refreshTokenExpiresIn } = jwtService.generateRefreshToken(privateUser);
-        res.status(200).json({
-          user: privateUser,
-          token: { result: token, expiresIn: tokenExpiresIn },
-          refreshToken: {
-            result: refreshToken,
-            expiresIn: refreshTokenExpiresIn,
-          },
-        });
+      
+      res.status(200).json({
+        user: privateUser,
+        token: { result: token, expiresIn: tokenExpiresIn },
+        refreshToken: {
+          result: refreshToken,
+          expiresIn: refreshTokenExpiresIn,
+        },
+      });
     } catch (error) {
       console.log(error);
       next(error);

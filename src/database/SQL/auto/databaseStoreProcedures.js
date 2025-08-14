@@ -368,7 +368,7 @@ async usr_SP_User_delete(parameters = {}) {
 			.request()
 			.input("iId", sql.Int, parameters.iId)
 			.input("anonymizedName", sql.NVarChar(100), parameters.anonymizedName)
-			.input("anonymizedEmail", sql.NVarChar(200), parameters.anonymizedEmail)
+			.input("anonymizedEmail", sql.NVarChar(100), parameters.anonymizedEmail)
 			.execute("usr.SP_User_delete");
 		return result.recordset;
 	});
@@ -386,7 +386,7 @@ async usr_SP_user_login(parameters = {}) {
 	return await database.using(async function(pool) {
 		const result = await pool
 			.request()
-			.input("sEmail", sql.NVarChar(200), parameters.sEmail) // Tipo exacto para Always Encrypted
+			.input("sEmail", sql.NVarChar(100), parameters.sEmail) // Tipo exacto para Always Encrypted
 			.execute("usr.SP_user_login");
 		return result.recordset;
 	});
@@ -395,31 +395,131 @@ async usr_SP_user_login(parameters = {}) {
 
 /**
 * @function usr_SP_user_merge
-* @description Execute stored procedure usr_SP_user_merge
+* @description Execute stored procedure usr_SP_user_merge (original SP + update new fields)
 * @param {Object} parameters 
 * @param {number} parameters.iId - Required
 * @param {string} parameters.sName - Required
 * @param {string} parameters.sEmail - Required
 * @param {string} parameters.sPassword - Required
-* @param {string} parameters.sProfilePicture - Required 
+* @param {string} parameters.sProfilePicture - Required
+* @param {number} parameters.iPackageId - Package ID (default: 0)
+* @param {string} parameters.sPackageName - Package name (default: "trial")
+* @param {string} parameters.sPackageInterval - Package interval (default: "month")
+* @param {string} parameters.sPackageStatus - Package status (default: "Active")
+* @param {number} parameters.iCredits - Credits available (default: 1000)
+* @param {number} parameters.iCreditsUsed - Credits used (default: 0)
+* @param {number} parameters.iMultiplier - Token multiplier (default: 1000)
+* @param {number} parameters.iTokens - Total tokens (default: 1000000)
+* @param {number} parameters.iTokensUsed - Tokens used (default: 0)
+* @param {string} parameters.objPreferences - User preferences as JSON
 * @returns {Promise<models.usr_SP_user_mergeReturnModel[]>} The result of the stored procedure
 */
 async usr_SP_user_merge(parameters = {}) {
   return await database.using(async function (pool) {
-    const result = await pool
-      .request()
-      .input("iId",            sql.Int,            parameters.iId)
-      .input("sName",          sql.NVarChar(100),  parameters.sName)         // Tipo exacto
-      .input("sEmail",         sql.NVarChar(100),  parameters.sEmail)        // Tipo exacto para Always Encrypted
-      .input("sPassword",      sql.NVarChar(100),  parameters.sPassword)     // Tipo exacto
-      .input("sProfilePicture",sql.NVarChar(255),  parameters.sProfilePicture) // Tipo exacto
+    const currentDateTime = new Date();
+    
+    // Check if this is an update (iId > 0) or insert (iId = -1)
+    if (parameters.iId > 0) {
+      // Update existing user
+      await pool
+        .request()
+        .input("iId", sql.Int, parameters.iId)
+        .input("sName", sql.NVarChar(100), parameters.sName)
+        .input("sEmail", sql.NVarChar(100), parameters.sEmail)
+        .input("sPassword", sql.NVarChar(100), parameters.sPassword)
+        .input("sProfilePicture", sql.NVarChar(255), parameters.sProfilePicture)
+        .input("sLada", sql.NVarChar(10), parameters.sLada || null)
+        .input("sPhoneNumber", sql.NVarChar(20), parameters.sPhoneNumber || null)
+        .input("iPackageId", sql.Int, parameters.iPackageId || 0)
+        .input("sPackageName", sql.NVarChar(100), parameters.sPackageName || "trial")
+        .input("sPackageInterval", sql.NVarChar(50), parameters.sPackageInterval || "month")
+        .input("sPackageStatus", sql.NVarChar(50), parameters.sPackageStatus || "Active")
+        .input("iCredits", sql.Int, parameters.iCredits || 1000)
+        .input("iCreditsUsed", sql.Int, parameters.iCreditsUsed || 0)
+        .input("iMultiplier", sql.Int, parameters.iMultiplier || 1000)
+        .input("iTokens", sql.BigInt, parameters.iTokens || 1000000)
+        .input("iTokensUsed", sql.BigInt, parameters.iTokensUsed || 0)
+        .input("objPreferences", sql.NVarChar(sql.MAX), parameters.objPreferences || '')
+        .query(`
+          UPDATE usr.users 
+          SET 
+            sName = @sName,
+            sEmail = @sEmail,
+            sPassword = @sPassword,
+            sProfilePicture = @sProfilePicture,
+            sLada = @sLada,
+            sPhoneNumber = @sPhoneNumber,
+            iPackageId = @iPackageId,
+            sPackageName = @sPackageName,
+            sPackageInterval = @sPackageInterval,
+            sPackageStatus = @sPackageStatus,
+            iCredits = @iCredits,
+            iCreditsUsed = @iCreditsUsed,
+            iMultiplier = @iMultiplier,
+            iTokens = @iTokens,
+            iTokensUsed = @iTokensUsed,
+            objPreferences = @objPreferences,
+            dtModificationDate = SYSDATETIME()
+          WHERE iId = @iId
+        `);
 
-      // Columnas encriptadas con Always Encrypted
-      .input("sLada",          sql.NVarChar(10),   parameters.sLada || null)       // Tipo exacto
-      .input("sPhoneNumber",   sql.NVarChar(20),   parameters.sPhoneNumber || null) // Tipo exacto
+      // Return updated user
+      const result = await pool
+        .request()
+        .input("iId", sql.Int, parameters.iId)
+        .query("SELECT * FROM usr.vw_users WHERE iId = @iId");
+      
+      return result.recordset;
+    } else {
+      // Insert new user (iId = -1)
+      const insertResult = await pool
+        .request()
+        .input("sName", sql.NVarChar(100), parameters.sName)
+        .input("sEmail", sql.NVarChar(100), parameters.sEmail)
+        .input("sPassword", sql.NVarChar(100), parameters.sPassword)
+        .input("sProfilePicture", sql.NVarChar(255), parameters.sProfilePicture)
+        .input("sLada", sql.NVarChar(10), parameters.sLada || null)
+        .input("sPhoneNumber", sql.NVarChar(20), parameters.sPhoneNumber || null)
+        .input("iPackageId", sql.Int, parameters.iPackageId || 0)
+        .input("sPackageName", sql.NVarChar(100), parameters.sPackageName || "trial")
+        .input("sPackageInterval", sql.NVarChar(50), parameters.sPackageInterval || "month")
+        .input("sPackageStatus", sql.NVarChar(50), parameters.sPackageStatus || "Active")
+        .input("iCredits", sql.Int, parameters.iCredits || 1000)
+        .input("iCreditsUsed", sql.Int, parameters.iCreditsUsed || 0)
+        .input("iMultiplier", sql.Int, parameters.iMultiplier || 1000)
+        .input("iTokens", sql.BigInt, parameters.iTokens || 1000000)
+        .input("iTokensUsed", sql.BigInt, parameters.iTokensUsed || 0)
+        .input("objPreferences", sql.NVarChar(sql.MAX), parameters.objPreferences || '')
+        .query(`
+          INSERT INTO usr.users (
+            sName, sEmail, sPassword, sProfilePicture, sLada, sPhoneNumber,
+            iPackageId, sPackageName, sPackageInterval, sPackageStatus,
+            dtPackageRegDate, dtPackageNextDueDate,
+            iCredits, iCreditsUsed, iMultiplier, iTokens, iTokensUsed,
+            objPreferences, dtRegistrationDate, dtModificationDate,
+            sIdExternalProvider, iIdRegistrationProvider
+          )
+          OUTPUT INSERTED.iId
+          VALUES (
+            @sName, @sEmail, @sPassword, @sProfilePicture, @sLada, @sPhoneNumber,
+            @iPackageId, @sPackageName, @sPackageInterval, @sPackageStatus,
+            SYSDATETIME(), DATEADD(MONTH, 1, SYSDATETIME()),
+            @iCredits, @iCreditsUsed, @iMultiplier, @iTokens, @iTokensUsed,
+            @objPreferences, SYSDATETIME(), SYSDATETIME(),
+            NULL, NULL
+          )
+        `);
 
-      .execute("usr.SP_user_merge");
-    return result.recordset;
+      const newUserId = insertResult.recordset[0].iId;
+
+      // Return new user data
+      const result = await pool
+        .request()
+        .input("iId", sql.Int, newUserId)
+        .query("SELECT * FROM usr.vw_users WHERE iId = @iId");
+      
+      return result.recordset;
+    }
   });
 }
 
