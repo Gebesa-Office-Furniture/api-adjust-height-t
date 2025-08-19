@@ -120,7 +120,7 @@ class AuthController {
       // Set default credits and tokens if not provided
       if (!user.iCredits) user.iCredits = 10000;
       if (!user.iCreditsUsed) user.iCreditsUsed = 0;
-      if (!user.iMultiplier) user.iMultiplier = 10000;
+      if (!user.iMultiplier) user.iMultiplier = 1000;
       if (!user.iTokens) user.iTokens = 10000000;
       if (!user.iTokensUsed) user.iTokensUsed = 0;
       
