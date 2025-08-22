@@ -845,6 +845,16 @@ class usr_users {
 	 * @param {number} conditions.iIdRegistrationProvider - Required
 	 * @param {Date} conditions.dtRegistrationDate - Required
 	 * @param {Date} conditions.dtModificationDate - Required
+	 * @param {number} conditions.iPackageId - Package ID
+	 * @param {string} conditions.sPackageName - Package name
+	 * @param {string} conditions.sPackageInterval - Package interval
+	 * @param {string} conditions.sPackageStatus - Package status
+	 * @param {number} conditions.iCredits - Credits available
+	 * @param {number} conditions.iCreditsUsed - Credits used
+	 * @param {number} conditions.iMultiplier - Token multiplier
+	 * @param {number} conditions.iTokens - Total tokens
+	 * @param {number} conditions.iTokensUsed - Tokens used
+	 * @param {string} conditions.objPreferences - User preferences as JSON
 	
 	 */
 	constructor(conditions = {}) {
@@ -860,6 +870,21 @@ class usr_users {
 		this.dtRegistrationDate = conditions.dtRegistrationDate;
 		this.dtModificationDate = conditions.dtModificationDate;
 		
+		// Package information
+		this.iPackageId = conditions.iPackageId;
+		this.sPackageName = conditions.sPackageName;
+		this.sPackageInterval = conditions.sPackageInterval;
+		this.sPackageStatus = conditions.sPackageStatus;
+		
+		// Credits and tokens
+		this.iCredits = conditions.iCredits;
+		this.iCreditsUsed = conditions.iCreditsUsed;
+		this.iMultiplier = conditions.iMultiplier;
+		this.iTokens = conditions.iTokens;
+		this.iTokensUsed = conditions.iTokensUsed;
+		
+		// User preferences
+		this.objPreferences = conditions.objPreferences;
 	}
 }
 
